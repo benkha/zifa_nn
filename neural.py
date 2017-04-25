@@ -14,15 +14,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
 def loss_function(true_label, reconstructed_label):
   zero = tf.zeros(tf.shape(true_label), dtype=tf.float32)
-  true_label = tf.Print(true_label, [true_label, tf.shape(true_label)], "True label")
   bool_vector = tf.not_equal(true_label, zero)
-  bool_vector = tf.Print(bool_vector, [bool_vector, tf.shape(bool_vector)])
   new_true = tf.where(bool_vector, true_label, zero)
-  new_true = tf.Print(new_true, [new_true, tf.shape(new_true)], "new_true")
   new_reconstructed = tf.where(bool_vector, reconstructed_label, zero)
   count = tf.count_nonzero(true_label)
   count = tf.to_float(count)
-  count = tf.Print(count, [count], "count")
   return tf.reduce_sum(tf.square(new_reconstructed - new_true)) / count
 
 
@@ -57,7 +53,7 @@ def autoencoder(gene_matrix, dimensions, genes_expressed, scale=True):
 
         sess = tf.Session()
 
-        train_step = 20000
+        train_step = 100000
         # train_step = 5
         train_batch = train_gene_mat.reshape((-1, genes_expressed))
         sess.run(tf.global_variables_initializer())
@@ -65,10 +61,10 @@ def autoencoder(gene_matrix, dimensions, genes_expressed, scale=True):
         for i in range(train_step):
                 ind = i%train_gene_mat.shape[0]
                 data = train_gene_mat[ind].reshape((1, genes_expressed))
-                _, loss2, W_1 = sess.run([backprop, mse, W1], feed_dict={input_placeholder:data})
+                _, loss2, W_1, b_1 = sess.run([backprop, mse, W1, b1], feed_dict={input_placeholder:data})
                 if i % 1000 == 0:
                         print(i, loss2)
-        return W_1
+        return W_1, b_1
         # for i in range(gene_matrix.shape[0]):
         #         if i%100==0:
         #                 print(i)
@@ -121,21 +117,21 @@ d = 20
 k = 2
 sigma = .3
 n_clusters = 3
-# decay_coef = .023 # 0.79
+decay_coef = .023 # 0.79
 # decay_coef = .1 # 0.64
-decay_coef = .34 # 0.07
+# decay_coef = .34 # 0.07
 
 
 
 X, Y, Z, ids = generateSimulatedDimensionalityReductionData(n_clusters, n, d, k, sigma, decay_coef)
 # Y_mean = np.mean(Y, axis=0)
 # Y_mean = Y - Y_mean
-test = autoencoder(Y, 2, 20, scale=False)
+test, bias = autoencoder(Y, 2, 20, scale=False)
 
 
 colors = ['red', 'blue', 'green']
 cluster_ids = sorted(list(set(ids)))
-factor_analysis_Zhat = Y @ test
+factor_analysis_Zhat = Y @ test + bias
 factor_std = np.std(factor_analysis_Zhat, axis=0)
 factor_analysis_Zhat = factor_analysis_Zhat / factor_std
 figure(figsize = [15, 5])
@@ -143,8 +139,12 @@ subplot(131)
 for id in cluster_ids:
     scatter(factor_analysis_Zhat[ids == id, 0], factor_analysis_Zhat[ids == id, 1], color = colors[id - 1], s = 4)
     title('Neural Network Estimated Latent Positions')
+    xlim([-4, 4])
+    ylim([-4, 4])
 subplot(132)
 for id in cluster_ids:
     scatter(Z[ids == id, 0], Z[ids == id, 1], color = colors[id - 1], s = 4)
     title('True Latent Positions\nFraction of Zeros %2.3f' % (Y == 0).mean())
+    xlim([-4, 4])
+    ylim([-4, 4])
 show()
